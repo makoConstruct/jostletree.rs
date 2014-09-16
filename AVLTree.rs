@@ -1,7 +1,9 @@
 #![feature(macro_rules)]
-use std::mem::{uninitialized, forget, transmute, swap};
+use std::mem::{uninitialized, forget, transmute};
 use std::ptr::{copy_nonoverlapping_memory};
 use std::cmp::{max, Ord, PartialEq};
+use std::fmt::{Show, Formatter};
+use std::fmt;
 use std::rand::random;
 
 //this code is not idiomatic, I am using raw pointers all over the place because the borrow checker is far too overbearing for low level code.
@@ -120,10 +122,10 @@ impl<T:PartialEq + Ord> AVLTree<T> {
 		unsafe fn node_insert<A:Ord>(trees_counter:&mut uint, cn:*mut Nref<A>, v:A){
 			match *cn {
 				Some(ref mut n) =>{
-					if n.v < v {
+					if v < n.v {
 						node_insert(trees_counter, &mut n.left, v);
 						balance(cn);
-					}else if n.v > v {
+					}else if v > n.v {
 						node_insert(trees_counter, &mut n.right, v);
 						balance(cn);
 					}//else is already present
@@ -187,9 +189,9 @@ impl<T:PartialEq + Ord> AVLTree<T> {
 			seeking(&mut self.count, v, &mut self.head_node);
 		};
 	}
-	pub fn has(&self, v:&T)-> bool{
+	pub fn contains(&self, v:&T)-> bool{
 		fn hasing<T:Ord + PartialEq>(cn:&Nref<T>, v:&T)-> bool {
-			match cn.as_ref() {
+			match *cn {
 				Some(ref n) =>{
 					n.v == *v || hasing(if *v <= n.v { &n.left }else{ &n.right }, v)
 				}
@@ -200,23 +202,26 @@ impl<T:PartialEq + Ord> AVLTree<T> {
 	}
 }
 
-// impl<T:Show> Show for Nref<T> {
-// 	pub fn fmt(&self, f:&mut Formatter)-> fmt::Result {
-// 		match self {
-// 			Some(this) => write!(f, "({} {} {})", &this.left, &this.v, &this.right),
-// 			None => write!(f, "nil"),
-// 		}
-// 	}
-// }
+struct ShowableNref<'a, T:'a> {
+	v:&'a Nref<T>
+}
+impl<'a, T:Show> Show for ShowableNref<'a, T> { //can't implement Show for an Option. Option already has a Show.
+	fn fmt(&self, f:&mut Formatter)-> fmt::Result {
+		match *self.v {
+			Some(ref this) => write!(f, "({} {} {})", ShowableNref{v:&this.left}, &this.v, ShowableNref{v:&this.right}),
+			None => write!(f, "nil"),
+		}
+	}
+}
 
-// impl<T:Show> Show for AVLTree<T> {
-// 	pub fn fmt(&self, f:&mut Formatter)-> fmt::Result {
-// 		write!(f,"{}", &self.head_node);
-// 	}
-// }
+impl<T:Show + Ord + PartialEq> Show for AVLTree<T> {
+	fn fmt(&self, f:&mut Formatter)-> fmt::Result {
+		write!(f,"{}", ShowableNref{v:&self.head_node})
+	}
+}
 
 #[test]
-fn many_insert(){
+fn many_insert_and_chech_has(){
 	let mut candidate: AVLTree<uint> = AVLTree::new();
 	candidate.insert(2);
 	candidate.insert(3);
@@ -227,26 +232,32 @@ fn many_insert(){
 	candidate.insert(10);
 	candidate.insert(11);
 	candidate.insert(9);
+	println!("{}", &candidate);
 	assert!(candidate.is_balanced());
 	println!("{}", candidate.element_count());
 	assert!(candidate.element_count() == 8);
+	assert!(!candidate.contains(&1u));
+	assert!(candidate.contains(&5u))
+	println!("{}", &candidate);
+	assert!(candidate.contains(&9u));
 }
 
 #[test]
 fn one_redundancy(){
-	let mut candidate: AVLTree<uint> = AVLTree::new();
+	let mut candidate = AVLTree::<uint>::new();
 	candidate.insert(50);
 	candidate.insert(40);
 	candidate.insert(45);
 	candidate.insert(47);
-	candidate.remove(47);
+	candidate.insert(47);
 	assert!(candidate.is_balanced());
+	println!("{}", &candidate);
 	assert!(candidate.element_count() == 4);
 }
 
 #[test]
 fn redundances(){
-	let mut candidate: AVLTree<uint> = AVLTree::new();
+	let mut candidate = AVLTree::<uint>::new();
 	candidate.insert(2);
 	candidate.remove(2);
 	candidate.remove(2);
@@ -257,20 +268,20 @@ fn redundances(){
 
 #[test]
 fn initially_empty(){
-	let mut candidate: AVLTree<uint> = AVLTree::new();
+	let candidate = AVLTree::<uint>::new();
 	assert!(candidate.empty());
 }
 
 #[test]
 fn not_empty_when_given_one(){
-	let mut candidate: AVLTree<uint> = AVLTree::new();
+	let mut candidate = AVLTree::<uint>::new();
 	candidate.insert(1);
 	assert!(!candidate.empty());
 }
 
 #[test]
 fn has_one_when_given_one(){
-	let mut candidate: AVLTree<uint> = AVLTree::new();
+	let mut candidate = AVLTree::<uint>::new();
 	candidate.insert(1);
 	assert!(candidate.count == 1);
 }
