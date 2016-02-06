@@ -1,0 +1,7 @@
+[package]
+name = "makods"
+authors = ["mako yass"]
+version = "1.0.0"
+
+[dependencies]
+rand = "0.3.13"
