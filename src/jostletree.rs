@@ -1,38 +1,33 @@
-#![feature(const_fn)]
+
 use std::mem::{uninitialized, forget, transmute, transmute_copy, replace};
-use std::ptr::{copy_nonoverlapping, null_mut, read, null};
-use std::fmt::{Display, Debug};
-use std::cmp::{max, Ord, PartialEq};
+use std::ptr::{copy_nonoverlapping, null_mut, read};
+use std::fmt::{Display};
+use std::cmp::{max};
 use std::iter::Iterator;
-use std::cell::{RefCell, UnsafeCell};
 
 
 //Some of this code is uglier than perhaps it could be given today's Rust. Unfortunately it was written with yesterday's rust, which couldn't end borrows before the end of the borrowing match block, for instance. For data structure code, some ugliness is required, in these parts.
 
 
-// unsafe fn warp_into_mut<T>(v:&T)-> &mut T { transmute(v) } //"mutating transmuted &mut T from &T may cause undefined behavior,consider instead using an UnsafeCell". It turns out rust passes a load of llvm flags behind the scenes, noalias and such, and transmute(&)-> &mut actually Doesn't Work. I'm kind of awed.
 
 #[inline(always)]
 unsafe fn warp_ptr_into_mut<'a, T>(v:*mut T)-> &'a mut T { transmute(v) }
 
 #[inline(always)]
-unsafe fn nonoverlapping_write<T>(mut v:T, dst:&mut T){
+unsafe fn nonoverlapping_write<T>(v:T, dst:&mut T){
 	copy_nonoverlapping(&v, dst, 1);
 	forget(v);
 }
 
-macro_rules! pr {
-	($e:expr) => {println!("{:#?}", $e)}
-}
 
-///warning: if f panics t will be freed twice. f must not panic.
-#[inline(always)]
-fn replace_self<T, F:FnOnce(T)->T> (t:&mut T, f:F){
-	unsafe{
-		let fr = f(read(t));
-		nonoverlapping_write(fr, t);
-	}
-}
+// ///warning: if f panics t will be freed twice. f must not panic.
+// #[inline(always)]
+// fn replace_self<T, F:FnOnce(T)->T> (t:&mut T, f:F){
+// 	unsafe{
+// 		let fr = f(read(t));
+// 		nonoverlapping_write(fr, t);
+// 	}
+// }
 
 #[inline(always)]
 fn replace_self_and_return<T, B, F:FnOnce(T)-> (T,B)> (t:&mut T, f:F)-> B {
@@ -41,11 +36,6 @@ fn replace_self_and_return<T, B, F:FnOnce(T)-> (T,B)> (t:&mut T, f:F)-> B {
 		nonoverlapping_write(fr, t);
 		ret
 	}
-}
-
-extern crate rand;
-fn tep(s:&'static str){
-	// if rand::random::<u32>()*900. < 2. { panic!("too many loop for {}", s) }
 }
 
 //serious functions panic on failure in debug mode and have undefined behavior on failure in release mode(but're perfectly efficient(presumably))
@@ -65,7 +55,7 @@ pub fn seriously_unwrap<T>(v:Option<T>)-> T {
 	}
 }
 
-unsafe fn warp_lifetime<'src, 'tgt, T>(inv:&'src T)-> &'tgt T {  transmute(inv)  }
+// unsafe fn warp_lifetime<'src, 'tgt, T>(inv:&'src T)-> &'tgt T {  transmute(inv)  }
 unsafe fn warp_lifetime_mut<'src, 'tgt, T>(inv:&'src mut T)-> &'tgt mut T {  transmute(inv)  }
 
 unsafe fn cp_nonoverlapping<T>(src:*const T, dst:*mut T){ copy_nonoverlapping(src,dst,1); }
@@ -89,7 +79,7 @@ unsafe fn warp_bptr_const<T>(v:*const Nref<T>)-> *const *const Branch<T> { trans
 unsafe fn warp_nullable<T>(v:*mut Nref<T>)-> *mut Branch<T> { transmute_copy(&*v) }
 
 
-unsafe fn rotate_right<A:Display>(old_root: *mut *mut Branch<A>){ //assumes root and leftofroot are some.
+unsafe fn rotate_right<A>(old_root: *mut *mut Branch<A>){ //assumes root and leftofroot are some.
 	let orp = *old_root;
 	let rleft:*mut Nref<A> = &mut (*orp).left;
 	let rleftright:*mut Nref<A> = &mut seriously_unwrap((*rleft).as_mut()).right;
@@ -158,10 +148,9 @@ fn count<T>(nref:&Nref<T>)-> u32 {
 fn total_span<T>(nref:&Nref<T>)-> u32 {
 	match *nref { Some(ref bbs)=> bbs.total_span, None=> 0 } }
 
-unsafe fn balance<T:Display>(rootofrotation: *mut *mut Branch<T>){
+unsafe fn balance<T>(rootofrotation: *mut *mut Branch<T>){
 	//OPTIMIZING: Might not always be necessary to update all three scores each time balance is called
 	let ro:&mut Branch<T> = &mut **rootofrotation;
-	println!("considering balancing {}", &ro.v);
 	ro.update_deepness();
 	ro.update_count();
 	ro.update_total_span();
@@ -214,10 +203,10 @@ fn leftmost_child_mut<T>(n: &mut Branch<T>)-> &mut Branch<T> {
 // }
 
 #[derive(Debug)]
-pub struct JostleTree<T:Ord>{
+pub struct JostleTree<T>{
 	head_node: Nref<T>,
 }
-impl<T:PartialEq + Ord + Display> JostleTree<T> {
+impl<T> JostleTree<T> {
 	pub fn new()-> JostleTree<T> { JostleTree{head_node:None} }
 	pub fn is_empty(&self)-> bool { self.head_node.is_none() }
 	pub fn len(&self)-> usize { count(&self.head_node) as usize }
@@ -230,13 +219,12 @@ impl<T:PartialEq + Ord + Display> JostleTree<T> {
 			let mut cn:&mut Nref<T> = &mut self.head_node;
 			let mut offset = at_offset;
 			// println!("inserting {}", &v);
-			loop{ tep("a");
+			loop{
 				let fcn:*mut _ = match *cn {
 					Some(ref mut n)=> {
 						// println!("looking at {}", &n.v);
 						let bspan = total_span(&n.left) + n.span;
 						n.total_span += span;
-						pr!(n.total_span);
 						if offset < bspan {
 							parent = &mut **n;
 							&mut n.left
@@ -259,7 +247,7 @@ impl<T:PartialEq + Ord + Display> JostleTree<T> {
 		};
 		unsafe{
 			let mut p = r.parent;
-			while !p.is_null() { tep("o");
+			while !p.is_null() {
 				// println!("{}", &(*p).v);
 				balance(parents_mut(&mut self.head_node, &mut*p));
 				p = (*p).parent;
@@ -272,7 +260,7 @@ impl<T:PartialEq + Ord + Display> JostleTree<T> {
 	//good version: Does not work because the borrowck is an IMBICILE, so I'll keep this around for later
 	// pub fn branch_at_offset(&mut self, mut o:u32)-> &mut Branch<T> { //negative or out of bounds o values will get first and last thing respectively
 	// 	let mut c = &mut **seriously_unwrap(self.head_node.as_mut()); //sufficed by the previous two lines
-	// 	loop{ tep("f");
+	// 	loop{
 	// 		let lts = total_span(&c.left);
 	// 		if o < lts {
 	// 			match c.left {
@@ -300,7 +288,7 @@ impl<T:PartialEq + Ord + Display> JostleTree<T> {
 				Some(ref mut br)=> &mut **br,
 				None=> return None,
 			};
-			loop{ tep("f");
+			loop{
 				let lts = total_span(&(*c).left);
 				if o < lts {
 					c = match (*c).left {
@@ -333,7 +321,7 @@ impl<T:PartialEq + Ord + Display> JostleTree<T> {
 					None
 				}else{
 					let mut c = &**cc;
-					loop{ tep("b");
+					loop{
 						let lnc = count(&c.left) as usize;
 						if i < lnc {
 							c = &**seriously_unwrap(c.left.as_ref());
@@ -365,12 +353,12 @@ impl<T:PartialEq + Ord + Display> JostleTree<T> {
 }
 
 
-impl<T:Display> Branch<T>{
+impl<T> Branch<T>{
 	pub fn offset(&self)-> u32 {
 		let mut ret = total_span(&self.left);
 		let mut p:*const _ = self.parent;
 		let mut pp = self;
-		loop{ tep("n");
+		loop{
 			if p.is_null() {break;}
 			let pr = unsafe{&*p};
 			if eq_branch(&pr.right, pp) {
@@ -383,11 +371,11 @@ impl<T:Display> Branch<T>{
 	}
 	pub fn get_span(&self)-> u32 { self.span }
 	pub fn set_span(&mut self, nv:u32){
-		if nv < 0 { panic!("attempt to set item in a JostleTree to a negative span"); }
+		// if nv < 0 { panic!("attempt to set item in a JostleTree to a negative span"); }
 		let dif = self.span - nv;
 		self.span = nv;
 		let mut p = self;
-		loop{ tep("m");
+		loop{
 			p.total_span += dif;
 			if p.parent.is_null() {break;}
 			p = unsafe{&mut *p.parent};
@@ -403,7 +391,7 @@ impl<T:Display> Branch<T>{
 				unsafe{
 					let mut upper_maybe = self.parent;
 					let next_node:Option<&Branch<T>>;
-					loop{ tep("c");
+					loop{
 						if upper_maybe != null_mut() {
 							if eq_branch(&(*upper_maybe).left, self as *const _) {
 								next_node = Some(transmute(upper_maybe));
@@ -431,7 +419,7 @@ impl<T:Display> Branch<T>{
 				unsafe{
 					let mut upper_maybe = self.parent;
 					let next_node:Option<&mut Branch<T>>;
-					loop{ tep("c");
+					loop{
 						if upper_maybe != null_mut() {
 							if eq_branch(&(*upper_maybe).left, self as *const _) {
 								next_node = Some(transmute(upper_maybe));
@@ -487,9 +475,8 @@ unsafe fn parents_mut<T>(rt:*mut Nref<T>, br:&mut Branch<T>)-> *mut *mut Branch<
 
 //an &mut Slot wrapper for mut_itering and for removals.
 pub struct SlotHandle<'a,T:'a>{head:*mut Nref<T>, v:&'a mut Branch<T>}
-impl<'a,T:Display> SlotHandle<'a,T>{
+impl<'a,T> SlotHandle<'a,T>{
 	//returns a ref to the ref in the parent to the given branch
-	unsafe fn parents_mut(&mut self)-> *mut *mut Branch<T> { parents_mut(self.head, self.v) }
 	pub fn remove(self)-> T {
 		let SlotHandle{head, v} = self;
 		let balancing_starts_with;
@@ -523,7 +510,6 @@ impl<'a,T:Display> SlotHandle<'a,T>{
 			}
 			(true, true)=> {
 				//find the highest child, remove it, replace v's v with its, modifying the lineage appropriately. Assumes the nref is some.
-				let return_node:*mut Branch<T> = &mut *v;
 				let mut cr:&mut Nref<T> = &mut v.left;
 				loop{
 					if seriously_unwrap(cr.as_ref()).right.is_some() {
@@ -545,7 +531,7 @@ impl<'a,T:Display> SlotHandle<'a,T>{
 			}
 		}
 		let mut p:*mut Branch<T> = balancing_starts_with;
-		while !p.is_null() { tep("d");
+		while !p.is_null() {
 			unsafe{
 				let rm = &mut *p;
 				balance(parents_mut(head, rm));
@@ -635,34 +621,6 @@ impl<'a, T:'a + Display> Iterator for JostleTreeIter<'a, T>{
 // }
 
 // impl<T:Eq+Ord> Eq for JostleTree<T> {}
-
-
-// struct DisplayableNref<'a, T:'a> {  v:&'a Nref<T>  }
-// impl<'a, T:Debug + Ord + PartialEq> Debug for DisplayableNref<'a, T> {
-// 	fn fmt(&self, f:&mut Formatter)-> fmt::Result {
-// 		match *self.v {
-// 			Some(ref this) => write!(f, "({:?} {:?} {:?})", DisplayableNref{v:&this.left}, &this.v, DisplayableNref{v:&this.right}),
-// 			None => write!(f, "nil"),
-// 		}
-// 	}
-// }
-// impl<T:Display + Ord + PartialEq> Display for JostleTree<T> {
-// 	fn fmt(&self, f:&mut Formatter)-> fmt::Result {
-// 		try!(write!(f,"JostleTree["));
-// 		let mut iter = self.iter();
-// 		match iter.next() {
-// 			Some(el)=> {
-// 				try!(write!(f,"{}", el));
-// 				for el in iter {
-// 					try!(write!(f,", {}", el));
-// 				}
-// 			},
-// 			_=> {}
-// 		};
-// 		try!(write!(f,"]"));
-// 		Ok(())
-// 	}
-// }
 	
 	
 	
@@ -673,8 +631,6 @@ mod tests{
 	use super::JostleTree;
 	use super::Nref;
 	use std::fmt::Display;
-	use std::io::Write;
-	use std::io::stdout;
 	use self::rand::{XorShiftRng, SeedableRng, Rng};
 	
 	#[inline(always)]
@@ -787,11 +743,9 @@ mod tests{
 		}
 		// println!("before cycles {:#?}", &candidate);
 		for _ in 0..cycles {
-			let block = 0;
-			for ci in 0..cyclesize {
+			for _ in 0..cyclesize {
 				let pos = (candidate.total_span() as f32 *rand_unit()).floor() as u32;
-				let s = candidate.slot_at_offset(pos).unwrap();
-				s.remove();
+				candidate.remove_at(pos);
 			}
 			// println!("before insertions {:#?}", &candidate);
 			for _ in 0..cyclesize {
