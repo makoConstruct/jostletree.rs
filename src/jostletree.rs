@@ -1,7 +1,8 @@
-
+use std::hash::{Hash, Hasher};
 use std::mem::{uninitialized, forget, transmute, transmute_copy, replace};
 use std::ptr::{copy_nonoverlapping, null_mut, read};
-use std::fmt::{Display};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::cmp::{max};
 use std::iter::Iterator;
 
@@ -172,18 +173,6 @@ unsafe fn balance<T>(rootofrotation: *mut *mut Branch<T>){
 		_ => ()
 	}
 }
-impl<T> Branch<T> {
-	fn balance_score(&self) -> i32 { deepness(&self.right) as i32 - deepness(&self.left) as i32 }
-	fn update_deepness(&mut self){
-		self.deepness = max(deepness(&self.left), deepness(&self.right)) + 1;
-	}
-	fn update_total_span(&mut self){
-		self.total_span = self.span + total_span(&self.left) + total_span(&self.right);
-	}
-	fn update_count(&mut self){
-		self.count = 1 + count(&self.left) + count(&self.right);
-	}
-}
 
 fn leftmost_child<T>(n: &Branch<T>)-> &Branch<T> {
 	match n.left {
@@ -352,6 +341,16 @@ impl<T> JostleTree<T> {
 	}
 }
 
+impl<T:Display> Display for JostleTree<T> {
+	fn fmt(&self, f:&mut Formatter)-> Result<(), fmt::Error> {
+		try!(write!(f, "JostleTree{{ "));
+		for b in self.iter() {
+			try!(write!(f, "{}:{} ", b.span, &b.v));
+		}
+		write!(f, "}}")
+	}
+}
+
 
 impl<T> Branch<T>{
 	pub fn offset(&self)-> u32 {
@@ -368,6 +367,18 @@ impl<T> Branch<T>{
 			p = unsafe{&*pr.parent};
 		}
 		ret
+	}
+	fn balance_score(&self) -> i32 { deepness(&self.right) as i32 - deepness(&self.left) as i32 }
+	fn update_deepness(&mut self){
+		self.deepness = max(deepness(&self.left), deepness(&self.right)) + 1;
+	}
+	pub fn element(&self)-> &T { &self.v }
+	pub fn element_mut(&mut self)-> &mut T { &mut self.v }
+	fn update_total_span(&mut self){
+		self.total_span = self.span + total_span(&self.left) + total_span(&self.right);
+	}
+	fn update_count(&mut self){
+		self.count = 1 + count(&self.left) + count(&self.right);
 	}
 	pub fn get_span(&self)-> u32 { self.span }
 	pub fn set_span(&mut self, nv:u32){
@@ -568,7 +579,7 @@ impl<'a,T> SlotHandle<'a,T>{
 
 
 pub struct JostleTreeIter<'a, T:'a>{c: Option<&'a Branch<T>>}
-impl<'a, T:'a + Display> Iterator for JostleTreeIter<'a, T>{
+impl<'a, T:'a> Iterator for JostleTreeIter<'a, T>{
 	type Item = &'a Branch<T>;
 	fn next(&mut self)-> Option<Self::Item> {
 		let oc = self.c;
@@ -580,45 +591,22 @@ impl<'a, T:'a + Display> Iterator for JostleTreeIter<'a, T>{
 	}
 }
 
-//just realized handleIters arn't safe, handles allow nexting to wherever you want and removing elements, which can sometimes swap the contents of branches and invalidate the invariant that JostleHandleIter.c points to the next element. Maybe I'll change this into a mut branch iter.
-// pub struct JostleHandleIter<'a, T:'a>{c: Option<&'a mut Branch<T>>}
-// impl<'a, T:'a> Iterator for JostleHandleIter<'a, T>{
-// 	type Item = &mut SlotHandle<'a,T>;
-// 	fn next(&mut self)-> Option<Self::Item> {
-// 		replace_self_and_return(&mut self.c, |c|{ match c {
-// 			Some(h)=>{
-// 				(unsafe{forced_copy(&h).next().map(|r| warp_into_mut(r))}, SlotHandle::from_mut(h))
-// 			},
-// 			None=> (None, None),
-// 		}})
-// 	}
-// }
+impl<T:Hash> Hash for JostleTree<T> {
+	fn hash<H:Hasher>(&self, h:&mut H) {
+		for br in self.iter() {
+			h.write_u32(br.get_span());
+			br.element().hash(h);
+		}
+	}
+}
 
 
-// fn hash_of<H:Hasher, T:Hash>(nr:&Nref<T>, h:&mut H){
-// 	match *nr {
-// 		Some(ref bn)=>{
-// 			bn.v.hash(h);
-// 			hash_of(&bn.left, h);
-// 			hash_of(&bn.right, h);
-// 		},
-// 		None=> {}
-// 	}
-// }
-
-// impl<T:Hash+Ord> Hash for JostleTree<T> {
-// 	fn hash<H:Hasher>(&self, h:&mut H) {
-// 		hash_of(&self.head_Branch, h);
-// 	}
-// }
-
-
-// impl<T:PartialEq+Ord> PartialEq for JostleTree<T> {
-// 	fn eq(&self, other:&JostleTree<T>)-> bool {
-// 		self.iter().zip(other.iter()).all(|(l,r)| l == r )
-// 	}
-// 	fn ne(&self, other:&JostleTree<T>)-> bool { ! self.eq(other) }
-// }
+impl<T:PartialEq> PartialEq for JostleTree<T> {
+	fn eq(&self, other:&JostleTree<T>)-> bool {
+		self.iter().zip(other.iter()).all(|(l,r)| l.element() == r.element() && l.get_span() == r.get_span() )
+	}
+	fn ne(&self, other:&JostleTree<T>)-> bool { ! self.eq(other) }
+}
 
 // impl<T:Eq+Ord> Eq for JostleTree<T> {}
 	
@@ -631,6 +619,7 @@ mod tests{
 	use super::JostleTree;
 	use super::Nref;
 	use std::fmt::Display;
+	use std::hash::{SipHasher, Hasher, Hash};
 	use self::rand::{XorShiftRng, SeedableRng, Rng};
 	
 	#[inline(always)]
@@ -678,13 +667,21 @@ mod tests{
 			assert!(fairly_eq(sl.offset(), ((i-1) as u32)*3));
 		}
 	}
-
-	fn print_entire<T:Ord+Display>(v:&JostleTree<T>){
-		print!("JostleTree ");
-		for b in v.iter() {
-			print!("{}:{} ", b.span, &b.v);
-		}
-		println!("");
+	
+	fn hash_of<T:Hash>(v:&T)-> u64 {
+		let mut s = SipHasher::new();
+		v.hash(&mut s);
+		s.finish()
+	}
+	
+	#[test]
+	fn hashes(){
+		let c1 = simple_insertions();
+		let mut c2 = simple_insertions();
+		c2.insert(0, 7, 7);
+		assert!(hash_of(&c1) != hash_of(&c2));
+		let c3 = simple_insertions();
+		assert!(hash_of(&c1) == hash_of(&c3));
 	}
 	
 	#[test]
@@ -726,9 +723,8 @@ mod tests{
 	
 	#[test]
 	fn big_attack(){
-		// println!("big_attack"); stdout().flush(); //assert!(false);
 		let mut candidate = JostleTree::<u64>::new();
-		let mut katy = XorShiftRng::from_seed(seed_slice(4));
+		let mut katy = XorShiftRng::from_seed(seed_slice(4)); //change this to try with a different starting set. (When you're testing, you want reproducible conditions, so a true RNG probably is not a good idea)
 		let mut rand_unit = ||{ katy.next_f32() };
 		let cycles:usize = 30;
 		let cyclesize:usize = 300;
@@ -759,7 +755,6 @@ mod tests{
 		
 		assert_eq!(candidate.len(), input_size as usize);
 		assert!(is_balanced(&candidate));
-		print_entire(&candidate);
 		assert_eq!(sum_of_spans(&candidate.head_node), candidate.total_span());
 	}
 }
