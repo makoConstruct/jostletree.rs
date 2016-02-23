@@ -201,48 +201,82 @@ impl<T> JostleTree<T> {
 	pub fn len(&self)-> usize { count(&self.head_node) as usize }
 	pub fn total_span(&self)-> u32 { total_span(&self.head_node) }
 	///inserts element v at or before whatever is at_offset
-	pub fn insert<'a>(&'a mut self, v:T, span:u32, at_offset:u32)-> SlotHandle<'a,T>{
-		let r;
-		{
-			let mut parent = null_mut();
-			let mut cn:&mut Nref<T> = &mut self.head_node;
-			let mut offset = at_offset;
-			// println!("inserting {}", &v);
-			loop{
-				let fcn:*mut _ = match *cn {
-					Some(ref mut n)=> {
-						// println!("looking at {}", &n.v);
-						let bspan = total_span(&n.left) + n.span;
-						n.total_span += span;
-						if offset < bspan {
-							parent = &mut **n;
-							&mut n.left
-						} else {
-							parent = &mut **n;
-							offset = offset - bspan;
-							&mut n.right
-						}
-					}
-					ref mut rcn@None=> {
-						// if !parent.is_null() { println!("parent is {}", unsafe{&(*parent).v}); }
-						let mut bb = box Branch{v:v, span:span, deepness:1, count:1, total_span:span, parent:parent, left:None, right:None};
-						r = unsafe{warp_lifetime_mut(&mut *bb)}; //we know that the location of Branch doesn't change, it doesn't get freed, and that it lives as long as the return value.
-						*rcn = Some(bb);
-						break;
-					}
-				};
-				cn = unsafe{warp_ptr_into_mut(fcn)};
-			}
-		};
-		unsafe{
-			let mut p = r.parent;
-			while !p.is_null() {
-				// println!("{}", &(*p).v);
-				balance(parents_mut(&mut self.head_node, &mut*p));
-				p = (*p).parent;
-			}
+	// pub fn insert(&'a mut self, v:T, span:u32)-> SlotHandle<'a,T>{
+	// }
+	unsafe fn create_at_and_balance_from<'a>(head_node:*mut Nref<T>, v:T, span:u32, rcn:&'a mut Nref<T>, parent:*mut Branch<T>)-> SlotHandle<'a,T> {
+		let mut bb = box Branch{v:v, span:span, deepness:1, count:1, total_span:span, parent:parent, left:None, right:None};
+		let r = warp_lifetime_mut(&mut *bb); //we know that the location of Branch doesn't change, it doesn't get freed, and that it lives as long as the return value.
+		*rcn = Some(bb);
+		let mut p = parent;
+		while !p.is_null() {
+			balance(parents_mut(head_node, &mut*p));
+			p = (*p).parent;
 		}
-		SlotHandle{head:&mut self.head_node, v:r}
+		SlotHandle{head:head_node, v:r}
+	}
+	pub fn insert_at<'a>(&'a mut self, v:T, span:u32, at_offset:u32)-> SlotHandle<'a,T>{
+		let mut parent = null_mut();
+		let head:*mut _ = &mut self.head_node;
+		let mut cn:&mut Nref<T> = &mut self.head_node;
+		let mut offset = at_offset;
+		// println!("inserting {}", &v);
+		loop{
+			let fcn:*mut _ = match *cn {
+				Some(ref mut n)=> {
+					// println!("looking at {}", &n.v);
+					let bspan = total_span(&n.left) + n.span;
+					n.total_span += span;
+					if offset < bspan {
+						parent = &mut **n;
+						&mut n.left
+					} else {
+						parent = &mut **n;
+						offset = offset - bspan;
+						&mut n.right
+					}
+				}
+				ref mut rcn@None=> {
+					return unsafe{ JostleTree::create_at_and_balance_from(head, v, span, rcn, parent) }
+				}
+			};
+			cn = unsafe{warp_ptr_into_mut(fcn)};
+		}
+	}
+	pub fn insert_back<'a>(&'a mut self, v:T, span:u32)-> SlotHandle<'a,T>{
+		let mut parent = null_mut();
+		let head:*mut _ = &mut self.head_node;
+		let mut cn:&mut Nref<T> = &mut self.head_node;
+		loop{
+			let fcn:*mut _ = match *cn {
+				Some(ref mut n)=> {
+					n.total_span += span;
+					parent = &mut **n;
+					&mut n.right
+				}
+				ref mut rcn@None=> {
+					return unsafe{ JostleTree::create_at_and_balance_from(head, v, span, rcn, parent) }
+				}
+			};
+			cn = unsafe{warp_ptr_into_mut(fcn)};
+		}
+	}
+	pub fn insert_front<'a>(&'a mut self, v:T, span:u32)-> SlotHandle<'a,T>{
+		let mut parent = null_mut();
+		let head:*mut _ = &mut self.head_node;
+		let mut cn:&mut Nref<T> = &mut self.head_node;
+		loop{
+			let fcn:*mut _ = match *cn {
+				Some(ref mut n)=> {
+					n.total_span += span;
+					parent = &mut **n;
+					&mut n.left
+				}
+				ref mut rcn@None=> {
+					return unsafe{ JostleTree::create_at_and_balance_from(head, v, span, rcn, parent) }
+				}
+			};
+			cn = unsafe{warp_ptr_into_mut(fcn)};
+		}
 	}
 	
 	
@@ -645,10 +679,10 @@ mod tests{
 
 	fn simple_insertions()-> JostleTree<u64> {
 		let mut candidate = JostleTree::<u64>::new();
-		candidate.insert(4, 3, 0);
-		candidate.insert(3, 3, 0);
-		candidate.insert(2, 3, 0);
-		candidate.insert(1, 3, 0);
+		candidate.insert_back(1, 3);
+		candidate.insert_back(2, 3);
+		candidate.insert_back(3, 3);
+		candidate.insert_back(4, 3);
 		candidate
 	}
 	
@@ -678,7 +712,7 @@ mod tests{
 	fn hashes(){
 		let c1 = simple_insertions();
 		let mut c2 = simple_insertions();
-		c2.insert(0, 7, 7);
+		c2.insert_at(0, 7, 7);
 		assert!(hash_of(&c1) != hash_of(&c2));
 		let c3 = simple_insertions();
 		assert!(hash_of(&c1) == hash_of(&c3));
@@ -721,10 +755,16 @@ mod tests{
 		[r1,r2,r3,r4]
 	}
 	
+	fn seed_of_the_now()-> [u32;4] {
+		let sotn = rand::random();
+		println!("using rng seed: {}.", sotn);
+		seed_slice(sotn)
+	}
+	
 	#[test]
 	fn big_attack(){
 		let mut candidate = JostleTree::<u64>::new();
-		let mut katy = XorShiftRng::from_seed(seed_slice(4)); //change this to try with a different starting set. (When you're testing, you want reproducible conditions, so a true RNG probably is not a good idea)
+		let mut katy = XorShiftRng::from_seed(seed_of_the_now()); //the seed should be printed if there's a break. use seed_slice(<printed seed>) instead to reproduce those conditions.
 		let mut rand_unit = ||{ katy.next_f32() };
 		let cycles:usize = 30;
 		let cyclesize:usize = 300;
@@ -733,7 +773,7 @@ mod tests{
 		loop {
 			let o:u32 = (candidate.total_span() as f32 *rand_unit()).floor() as u32;
 			let rspan = 80.*ease_in_out(rand_unit());
-			candidate.insert(i as u64, (rspan*rspan) as u32, o);
+			candidate.insert_at(i as u64, (rspan*rspan) as u32, o);
 			i += 1;
 			if i >= input_size {break}
 		}
@@ -747,7 +787,7 @@ mod tests{
 			for _ in 0..cyclesize {
 				let o = (candidate.total_span() as f32 *rand_unit()) as u32;
 				let rspan = 80. *ease_in_out(rand_unit());
-				candidate.insert(i as u64, (rspan*rspan).floor() as u32, o);
+				candidate.insert_at(i as u64, (rspan*rspan).floor() as u32, o);
 				i += 1;
 			}
 			// println!("after insertions {:#?}", &candidate);
