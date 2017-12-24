@@ -2,9 +2,10 @@
 name = "makods"
 authors = ["mako yass"]
 version = "0.2.0"
-description = "Provides the jostle tree, A data structure for working with long sequences of variable-width spans"
+description = "The Jostle Tree, a data structure for working with long sequences of variable-width items."
 repository = "https://github.com/makoConstruct/jostletree.rs"
 license = "MIT"
+readme = "README.md"
 
 [dev-dependencies]
 rand = "0.3.0"

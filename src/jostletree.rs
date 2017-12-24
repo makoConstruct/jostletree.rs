@@ -182,9 +182,13 @@ fn leftmost_child_mut<T>(n: &mut Branch<T>)-> &mut Branch<T> {
 }
 
 /// The JostleTree can be thought of as efficiently modelling a sequence of items of variable widths. It allows operations such as
+///
 /// * jumping to a position and getting whatever item is there,
+///
 /// * resizing items, in so doing, repositioning every one of the items after it.
+///
 /// * inserting and removing
+///
 ///
 /// Operations generally have logarithmic runtime.
 #[derive(Debug)]
