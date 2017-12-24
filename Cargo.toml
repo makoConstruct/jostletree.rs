@@ -1,9 +1,8 @@
 [package]
 name = "makods"
 authors = ["mako yass"]
-version = "1.0.0"
-
-[dependencies]
-rand = "0.3.0"
+version = "0.2.0"
+description = "Provides a jostletree. A data structure for working with long sequences of variable width spans"
 
 [dev-dependencies]
+rand = "0.3.0"

@@ -7,9 +7,6 @@ use std::cmp::{max};
 use std::iter::Iterator;
 
 
-//Some of this code is uglier than perhaps it could be given today's Rust. Unfortunately it was written with yesterday's rust, which couldn't end borrows before the end of the borrowing match block, for instance. For data structure code, some ugliness is required, in these parts.
-
-
 
 #[inline(always)]
 unsafe fn warp_ptr_into_mut<'a, T>(v:*mut T)-> &'a mut T { transmute(v) }
@@ -39,17 +36,14 @@ fn replace_self_and_return<T, B, F:FnOnce(T)-> (T,B)> (t:&mut T, f:F)-> B {
 	}
 }
 
-//serious functions panic on failure in debug mode and have undefined behavior on failure in release mode(but're perfectly efficient(presumably))
+///serious functions panic on failure in debug mode and have undefined behavior on failure in release mode (but in this case they're perfectly efficient)
 #[inline(always)]
-pub fn seriously_unreachable()-> ! {
-	seriously_unreach("this code is not supposed to be reachable") }
-#[inline(always)]
-pub fn seriously_unreach(s:&str)-> ! {
+fn seriously_unreach(s:&str)-> ! {
 	if cfg!(debug_assertions) { panic!("{}", s) }
 	else{ unsafe{::std::intrinsics::unreachable()} }
 }
 #[inline(always)]
-pub fn seriously_unwrap<T>(v:Option<T>)-> T {
+fn seriously_unwrap<T>(v:Option<T>)-> T {
 	match v {
 		Some(r)=> r,
 		None=> seriously_unreach("this option must not be None"),
@@ -187,10 +181,12 @@ fn leftmost_child_mut<T>(n: &mut Branch<T>)-> &mut Branch<T> {
 	}
 }
 
-// fn leftmost_child_mut<T>(n: &mut Branch<T>)-> &mut Branch<T> {
-// 	unsafe{warp_into_mut(leftmost_child(n))}
-// }
-
+/// The JostleTree can be thought of as efficiently modelling a sequence of items of variable widths. It allows operations such as
+/// * jumping to a position and getting whatever item is there,
+/// * resizing items, in so doing, repositioning every one of the items after it.
+/// * inserting and removing
+///
+/// Operations generally have logarithmic runtime.
 #[derive(Debug)]
 pub struct JostleTree<T>{
 	head_node: Nref<T>,
@@ -199,10 +195,8 @@ impl<T> JostleTree<T> {
 	pub fn new()-> JostleTree<T> { JostleTree{head_node:None} }
 	pub fn is_empty(&self)-> bool { self.head_node.is_none() }
 	pub fn len(&self)-> usize { count(&self.head_node) as usize }
+	/// returns the sum of the spans of all of the items (logarithmic runtime)
 	pub fn total_span(&self)-> u32 { total_span(&self.head_node) }
-	///inserts element v at or before whatever is at_offset
-	// pub fn insert(&'a mut self, v:T, span:u32)-> SlotHandle<'a,T>{
-	// }
 	unsafe fn create_at_and_balance_from<'a>(head_node:*mut Nref<T>, v:T, span:u32, rcn:&'a mut Nref<T>, parent:*mut Branch<T>)-> SlotHandle<'a,T> {
 		let mut bb = box Branch{v:v, span:span, deepness:1, count:1, total_span:span, parent:parent, left:None, right:None};
 		let r = warp_lifetime_mut(&mut *bb); //we know that the location of Branch doesn't change, it doesn't get freed, and that it lives as long as the return value.
@@ -214,16 +208,15 @@ impl<T> JostleTree<T> {
 		}
 		SlotHandle{head:head_node, v:r}
 	}
+	/// inserts at or before whatever is at_offset.
 	pub fn insert_at<'a>(&'a mut self, v:T, span:u32, at_offset:u32)-> SlotHandle<'a,T>{
 		let mut parent = null_mut();
 		let head:*mut _ = &mut self.head_node;
 		let mut cn:&mut Nref<T> = &mut self.head_node;
 		let mut offset = at_offset;
-		// println!("inserting {}", &v);
 		loop{
 			let fcn:*mut _ = match *cn {
 				Some(ref mut n)=> {
-					// println!("looking at {}", &n.v);
 					let bspan = total_span(&n.left) + n.span;
 					n.total_span += span;
 					if offset < bspan {
@@ -242,46 +235,40 @@ impl<T> JostleTree<T> {
 			cn = unsafe{warp_ptr_into_mut(fcn)};
 		}
 	}
+	
+	#[inline(always)]
+	fn insert_where<'a>(&'a mut self, v:T, span:u32, front:bool)-> SlotHandle<'a,T>{
+		let mut parent = null_mut();
+		let head:*mut _ = &mut self.head_node;
+		let mut cn:&mut Nref<T> = &mut self.head_node;
+		loop{
+			let fcn:*mut _ = match *cn {
+				Some(ref mut n)=> {
+					n.total_span += span;
+					parent = &mut **n;
+					if front { &mut n.left } else { &mut n.right }
+				}
+				ref mut rcn@None=> {
+					return unsafe{ JostleTree::create_at_and_balance_from(head, v, span, rcn, parent) }
+				}
+			};
+			cn = unsafe{warp_ptr_into_mut(fcn)};
+		}
+	}
+	
+	/// inserts at the back
 	pub fn insert_back<'a>(&'a mut self, v:T, span:u32)-> SlotHandle<'a,T>{
-		let mut parent = null_mut();
-		let head:*mut _ = &mut self.head_node;
-		let mut cn:&mut Nref<T> = &mut self.head_node;
-		loop{
-			let fcn:*mut _ = match *cn {
-				Some(ref mut n)=> {
-					n.total_span += span;
-					parent = &mut **n;
-					&mut n.right
-				}
-				ref mut rcn@None=> {
-					return unsafe{ JostleTree::create_at_and_balance_from(head, v, span, rcn, parent) }
-				}
-			};
-			cn = unsafe{warp_ptr_into_mut(fcn)};
-		}
+		self.insert_where(v,span,false)
 	}
+	
+	/// inserts at the front
 	pub fn insert_front<'a>(&'a mut self, v:T, span:u32)-> SlotHandle<'a,T>{
-		let mut parent = null_mut();
-		let head:*mut _ = &mut self.head_node;
-		let mut cn:&mut Nref<T> = &mut self.head_node;
-		loop{
-			let fcn:*mut _ = match *cn {
-				Some(ref mut n)=> {
-					n.total_span += span;
-					parent = &mut **n;
-					&mut n.left
-				}
-				ref mut rcn@None=> {
-					return unsafe{ JostleTree::create_at_and_balance_from(head, v, span, rcn, parent) }
-				}
-			};
-			cn = unsafe{warp_ptr_into_mut(fcn)};
-		}
+		self.insert_where(v,span,true)
 	}
 	
 	
-	//good version: Does not work because the borrowck is an IMBICILE, so I'll keep this around for later
-	// pub fn branch_at_offset(&mut self, mut o:u32)-> &mut Branch<T> { //negative or out of bounds o values will get first and last thing respectively
+	//good version: Does not work because the borrowck is an IMBICILE, so I'll keep this around for nll
+	// fn branch_at_offset_mut(&mut self, mut o:u32)-> &mut Branch<T> { //negative or out of bounds o values will get first and last thing respectively
 	// 	let mut c = &mut **seriously_unwrap(self.head_node.as_mut()); //sufficed by the previous two lines
 	// 	loop{
 	// 		let lts = total_span(&c.left);
@@ -304,8 +291,11 @@ impl<T> JostleTree<T> {
 	// 	}
 	// }
 	
-	//see above for the reasonable version
-	pub fn branch_at_offset(&mut self, mut o:u32)-> Option<&mut Branch<T>> { //negative or out of bounds o values will get first and last thing respectively. returns None if tree is empty.
+	/// returns the branch at the offset o
+	///
+	/// negative or out of bounds o values will get first and last thing respectively. returns None if tree is empty.
+	fn branch_at_offset_mut(&mut self, mut o:u32)-> Option<&mut Branch<T>> {
+		//see above for the reasonable version
 		unsafe{//alright, you know what, rust? I'm going to use a fucking pointer for this until you figure out how to infer basic limits to borrows, because I've tried everything that makes sense and none of it is enough for you.
 			let mut c:*mut Branch<T> = match self.head_node {
 				Some(ref mut br)=> &mut **br,
@@ -333,52 +323,91 @@ impl<T> JostleTree<T> {
 		}
 	}
 	
-	pub fn remove_at(&mut self, o:u32)-> Option<T> {
-		self.slot_at_offset(o).map(|b|b.remove())
-	}
-	///returns none iff index out of bounds
-	pub fn branch_at_index(&self, mut i:usize)-> Option<&Branch<T>> {
-		match self.head_node {
-			Some(ref cc)=>
-				if i >= cc.count as usize {
-					None
+	fn branch_at_offset(&self, mut o:u32)-> Option<&Branch<T>> { //copy of the above
+		//see above for the reasonable version
+		unsafe{//alright, you know what, rust? I'm going to use a fucking pointer for this until you figure out how to infer basic limits to borrows, because I've tried everything that makes sense and none of it is enough for you.
+			let mut c:*const Branch<T> = match self.head_node {
+				Some(ref br)=> & **br,
+				None=> return None,
+			};
+			loop{
+				let lts = total_span(&(*c).left);
+				if o < lts {
+					c = match (*c).left {
+						Some(ref cl)=> & **cl,
+						None=> return Some(& *c),
+					};
 				}else{
-					let mut c = &**cc;
-					loop{
-						let lnc = count(&c.left) as usize;
-						if i < lnc {
-							c = &**seriously_unwrap(c.left.as_ref());
-						}else if i == lnc {
-							break;
-						}else{
-							i -= lnc+1usize;
-							c = &**seriously_unwrap(c.right.as_ref());
-						}
+					let rts = lts + (*c).span;
+					if o < rts { return Some(& *c) }
+					else {
+						c = match (*c).right {
+							Some(ref rb)=> & **rb,
+							None=> return Some(& *c),
+						};
+						o -= rts;
 					}
-					Some(c)
-				},
-			None=> None
+				}
+			}
 		}
 	}
-	// pub fn branch_at_index_mut(&mut self, i:usize)-> Option<&mut Branch<T>> {
-	// 	self.branch_at_index(i).map(|rm| unsafe{warp_into_mut(rm)})
-	// }
-	pub fn slot_at_offset<'a>(&'a mut self, o:u32)-> Option<SlotHandle<'a,T>> { //None if tree is empty
+	
+	/// returns the bucket at the offset o
+	///
+	/// negative or out of bounds o values will get first and last thing respectively. returns None if tree is empty.
+	pub fn get_slot_mut<'a>(&'a mut self, o:u32)-> Option<SlotHandle<'a,T>> { //None if tree is empty
 		let head_ptr:*mut _ = &mut self.head_node;
-		self.branch_at_offset(o).map(move|bof| SlotHandle{head:head_ptr, v:bof})
+		self.branch_at_offset_mut(o).map(move|bof| SlotHandle{head:head_ptr, v:bof})
 	}
-	pub fn clear(&mut self){
-		self.head_node = None;
+	
+	pub fn get_item(&self, o:u32)-> Option<&T> { //None if tree is empty
+		self.branch_at_offset(o).map(|bof| &bof.v)
 	}
-	pub fn iter<'a>(&'a self)-> JostleTreeIter<'a, T> {
-		JostleTreeIter{c:self.head_node.as_ref().map( |n|leftmost_child(n) )}
+	
+
+	/// negative or out of bounds o values will hit the first and last thing respectively. returns None if tree is empty.
+	pub fn remove_at(&mut self, o:u32)-> Option<T> {
+		self.get_slot_mut(o).map(|b|b.remove())
+	}
+	
+	/// negative or out of bounds o values will get first and last thing respectively. returns None if tree is empty.
+	// considering deleting:
+	// fn branch_at_index(&self, mut i:usize)-> Option<&Branch<T>> {
+	// 	match self.head_node {
+	// 		Some(ref cc)=>
+	// 			if i >= cc.count as usize {
+	// 				None
+	// 			}else{
+	// 				let mut c = &**cc;
+	// 				loop{
+	// 					let lnc = count(&c.left) as usize;
+	// 					if i < lnc {
+	// 						c = &**seriously_unwrap(c.left.as_ref());
+	// 					}else if i == lnc {
+	// 						break;
+	// 					}else{
+	// 						i -= lnc+1usize;
+	// 						c = &**seriously_unwrap(c.right.as_ref());
+	// 					}
+	// 				}
+	// 				Some(c)
+	// 			},
+	// 		None=> None
+	// 	}
+	// }
+	
+	pub fn clear(&mut self){ self.head_node = None; }
+	
+	/// Iterates over the buckets
+	pub fn slot_iter<'a>(&'a self)-> JostleTreeIter<'a, T> {
+		JostleTreeIter{c:self.head_node.as_ref().map( |n| leftmost_child(n) )}
 	}
 }
 
 impl<T:Display> Display for JostleTree<T> {
 	fn fmt(&self, f:&mut Formatter)-> Result<(), fmt::Error> {
 		try!(write!(f, "JostleTree{{ "));
-		for b in self.iter() {
+		for b in self.slot_iter() {
 			try!(write!(f, "{}:{} ", b.span, &b.v));
 		}
 		write!(f, "}}")
@@ -454,7 +483,7 @@ impl<T> Branch<T>{
 			}
 		}
 	}
-	pub fn next_mut(&mut self)-> Option<&mut Branch<T>> { //haha it's just a copy of the last one because no mutable generics and unsafe casts from immutable to mutable will be prevented from working by the LLVM flags
+	pub fn next_mut(&mut self)-> Option<&mut Branch<T>> { //haha it's just a copy of the last one because I'm not aware of any way of making it generic over mutability, and unsafe casts from immutable to mutable will be prevented from working by the LLVM flags
 		match self.right {
 			Some(ref mut n) =>{
 				Some(leftmost_child_mut(n))
@@ -498,7 +527,7 @@ impl<T> Branch<T>{
 	// 			Branch(ref box b)=> &b.right,
 	// 		};
 	// 	}
-	// }
+	// }seriously_unwrap
 }
 
 unsafe fn parents_mut<T>(rt:*mut Nref<T>, br:&mut Branch<T>)-> *mut *mut Branch<T> {
@@ -625,9 +654,25 @@ impl<'a, T:'a> Iterator for JostleTreeIter<'a, T>{
 	}
 }
 
+//TODO: Activate this once nll is stabilized
+// pub struct JostleTreeMutIter<'a, T:'a>{c: Option<&'a mut Branch<T>>}
+// impl<'a, T:'a> Iterator for JostleTreeMutIter<'a, T>{
+// 	type Item = &'a mut T; //it's not safe to iterate over branches mutably, changing the spans would have to change the structure of the tree
+// 	fn next(&mut self)-> Option<Self::Item> {
+// 		let oc = self.c;
+// 		match oc {
+// 			Some(esr)=> self.c = esr.next_mut(),
+// 			None=> {}
+// 		}
+// 		&mut oc.v
+// 	}
+// }
+
+
+
 impl<T:Hash> Hash for JostleTree<T> {
 	fn hash<H:Hasher>(&self, h:&mut H) {
-		for br in self.iter() {
+		for br in self.slot_iter() {
 			h.write_u32(br.get_span());
 			br.element().hash(h);
 		}
@@ -637,7 +682,7 @@ impl<T:Hash> Hash for JostleTree<T> {
 
 impl<T:PartialEq> PartialEq for JostleTree<T> {
 	fn eq(&self, other:&JostleTree<T>)-> bool {
-		self.iter().zip(other.iter()).all(|(l,r)| l.element() == r.element() && l.get_span() == r.get_span() )
+		self.slot_iter().zip(other.slot_iter()).all(|(l,r)| l.element() == r.element() && l.get_span() == r.get_span() )
 	}
 	fn ne(&self, other:&JostleTree<T>)-> bool { ! self.eq(other) }
 }
@@ -653,7 +698,8 @@ mod tests{
 	use super::JostleTree;
 	use super::Nref;
 	use std::fmt::Display;
-	use std::hash::{SipHasher, Hasher, Hash};
+	use std::hash::{Hasher, Hash};
+	use std::collections::hash_map::DefaultHasher;
 	use self::rand::{XorShiftRng, SeedableRng, Rng};
 	
 	#[inline(always)]
@@ -674,7 +720,7 @@ mod tests{
 	}
 	
 	fn sequence_equal<T:Ord+Display>(v:&JostleTree<T>, t:&[T])-> bool {
-		v.len() == t.len() && v.iter().zip(t.iter()).all(|(a,i)|{ a.v==*i })
+		v.len() == t.len() && v.slot_iter().zip(t.iter()).all(|(a,i)|{ a.v==*i })
 	}
 
 	fn simple_insertions()-> JostleTree<u64> {
@@ -696,14 +742,14 @@ mod tests{
 	
 	#[test]
 	fn iteration_and_order(){
-		for (sl, i) in simple_insertions().iter().zip(1..) {
+		for (sl, i) in simple_insertions().slot_iter().zip(1..) {
 			assert_eq!(sl.v, i);
 			assert!(fairly_eq(sl.offset(), ((i-1) as u32)*3));
 		}
 	}
 	
 	fn hash_of<T:Hash>(v:&T)-> u64 {
-		let mut s = SipHasher::new();
+		let mut s = DefaultHasher::new();
 		v.hash(&mut s);
 		s.finish()
 	}
@@ -722,7 +768,7 @@ mod tests{
 	fn removal(){
 		let mut candidate = simple_insertions();
 		{
-			let c = candidate.slot_at_offset(4).unwrap();
+			let c = candidate.get_slot_mut(4).unwrap();
 			c.remove();
 		}
 		assert!(sequence_equal(&candidate, &[1,3,4]));
