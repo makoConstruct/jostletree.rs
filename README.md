@@ -8,6 +8,18 @@ The positions of the elements are effectively distributed throughout the tree. E
 
 Don't hesitate to ask if you want an API feature added, I'll get to it ASAP. There are a few fairly trivial things I haven't done yet because I don't need them myself yet, and it'll be less work if it's done after non-lexical lifetimes is stabilized.
 
+
+```rust
+
+```
+
+## Using floats as spans
+
+The data structure is generic over span types, but `f32`s and `f64`s wont work because they do not implement `Ord`. Why not? Floats can only implement `PartialOrd` because there is a float for which neither a < b nor a > b. Can you guess which float it is?.. It's `NaN`. `NaN` is also the reason floats can't implement `Eq`. There are some data structures that will actually break and do unsafe things if you give trick them into using floats, for this reason. `NaN`s are pretty horrible, really.
+
+But fear not. You can just use https://crates.io/crates/noisy_float. It's a no-overhead wrapper around floats that disallows `NaN`s.
+
+
 ## Possible Applications
 
 * It was conceived for the application of storing enormous sequence, or tree UIs, where multiple users could be altering the structure at the same time. Users would be able to view an approximate overview, to jump to arbitrary offsets instantly, all in logorithmic time. This may require a parallel implementation though =/
