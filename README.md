@@ -37,3 +37,7 @@ But fear not. You can just use https://crates.io/crates/noisy_float. It's a no-o
 * Drawing randomly from a large set of weighted elements, such that the probability of drawing a particular element is proportional to its weight, and the weights of each element can change, and where new elements can be added and removed. I know of no other method for doing this efficiently. If you don't want each element to be weighted individually, the JostleTree also provides indexing by order, as if it were an array with efficient insertion. It would make it very easy to draw with a bias towards elements at the front.
 
 * I don't know. Largely I just made this because it pinged my heuristics for potential usefulness and I couldn't find any preexisting implementations. Hopefully others can think of more applications than I can.
+
+## Past work
+
+It's very similar to a Partial Sum Tree as described in [AN EFFICIENT METHOD FOR WEIGHTED SAMPLING WITHOUT REPLACEMENT* C. K. WONG AND M. C. EASTON](https://doi.org/10.1137/0209009). The difference is, it stores elements and element weights in branches instead of in special different leaf nodes, reducing the number of allocations by about half, and reducing the number of accesses per query logarithmically? I'm not sure why anybody would do it the other way.

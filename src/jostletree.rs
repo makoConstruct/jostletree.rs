@@ -136,14 +136,14 @@ unsafe fn rotate_left<N,A>(old_root: *mut *mut Branch<N,A>) where N:Numeric { //
 
 #[derive(Debug)]
 pub struct Branch<N,T> {
+	parent: *mut Branch<N,T>,
+	left: Nref<N,T>,
+	right: Nref<N,T>,
 	pub v:T,
 	deepness:u8,
 	count:usize,
 	span:N,
 	total_span:N,
-	parent: *mut Branch<N,T>,
-	left: Nref<N,T>,
-	right: Nref<N,T>,
 }
 type Nref<N,T> = Option<Box<Branch<N,T>>>;
 fn eq_branch<N,T>(v:&Nref<N,T>, other:*const Branch<N,T>)-> bool { (other == unsafe{*warp_bptr_const(v)}) }
