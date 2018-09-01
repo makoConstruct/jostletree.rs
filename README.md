@@ -1,12 +1,8 @@
 # JostleTree
 
-A JostleTree is a new (I think?) data structure for working with long lines of tightly packed items with variable widths.
+A JostleTree is a Partial Sum Tree with item widths stored in the branches of the tree, rather than just the leaves.
 
-In other words, the JostleTree can be thought of as efficiently modelling a sequence of items of variable widths. It allows operations such as jumping to a position and getting whatever item is there, and, resizing items, in so doing, repositioning every one of the items after it. It does this in logarithmic time.
-
-The positions of the elements are effectively distributed throughout the tree. Each node of the tree stores the sum width of all of the elements underneath it.
-
-Don't hesitate to ask if you want an API feature added, I'll get to it ASAP. There are a few fairly trivial things I haven't done yet because I don't need them myself yet, and it'll be less work if it's done after non-lexical lifetimes is stabilized.
+The jostletree can be thought of as representing a series of items with variable span, positioned one after the other. If the span of one item changes, the positions of all of the items after it shift along with it. The jostletree supports logarithmic time access at position, resize node, insert node, and remove node operations.
 
 
 ```rust
