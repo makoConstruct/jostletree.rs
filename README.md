@@ -4,6 +4,7 @@ A JostleTree is a Partial Sum Tree with item widths stored in the branches of th
 
 The jostletree can be thought of as representing a series of items with variable span, positioned one after the other. If the span of one item changes, the positions of all of the items after it shift along with it. The jostletree supports logarithmic time access at position, resize node, insert node, and remove node operations.
 
+Its main application seems to be in sampling randomly from large sets where each element in the set may have a different probability of being drawn.
 
 ```rust
 let mut candidate = JostleTree::<usize, char>::new();
@@ -25,14 +26,11 @@ The data structure is generic over span types, but `f32`s and `f64`s wont work b
 
 But fear not. You can just use https://crates.io/crates/noisy_float. It's a no-overhead wrapper around floats that disallows `NaN`s.
 
+## Other Possible Applications
 
-## Possible Applications
+It was conceived for the application of storing enormous sequence, or tree UIs, where multiple users could be altering the structure at the same time. Users would be able to view an approximate overview, to jump to arbitrary offsets instantly, all in logorithmic time. Actually doing this might require some concurrency work though
 
-* It was conceived for the application of storing enormous sequence, or tree UIs, where multiple users could be altering the structure at the same time. Users would be able to view an approximate overview, to jump to arbitrary offsets instantly, all in logorithmic time. This may require a parallel implementation though =/
-
-* Drawing randomly from a large set of weighted elements, such that the probability of drawing a particular element is proportional to its weight, and the weights of each element can change, and where new elements can be added and removed. I know of no other method for doing this efficiently. If you don't want each element to be weighted individually, the JostleTree also provides indexing by order, as if it were an array with efficient insertion. It would make it very easy to draw with a bias towards elements at the front.
-
-* I don't know. Largely I just made this because it pinged my heuristics for potential usefulness and I couldn't find any preexisting implementations. Hopefully others can think of more applications than I can.
+I made this mainly because it pinged my heuristics for potential usefulness and I couldn't find any preexisting implementations. Hopefully others can think of more applications than I can.
 
 ## Past work
 
