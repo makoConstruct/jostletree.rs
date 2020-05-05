@@ -431,6 +431,19 @@ impl<N:Numeric + Display, T:Display> Display for JostleTree<N,T> {
 }
 
 
+//Todo: I could make this a bit more efficient than repeated insertion
+impl<N, T> std::iter::FromIterator<(N, T)> for JostleTree<N, T> where N:Numeric {
+	fn from_iter<I: IntoIterator<Item=(N, T)>>(iter: I) -> Self {
+		let mut ret = JostleTree::new();
+		for (n, v) in iter {
+			ret.insert_back(n, v);
+		}
+		ret
+	}
+}
+
+
+
 impl<N:Numeric,T> Branch<N,T> {
 	pub fn offset(&self)-> N {
 		let mut ret = total_span(&self.left);

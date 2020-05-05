@@ -2,9 +2,11 @@
 
 A JostleTree is a Partial Sum Tree with item widths stored in the branches of the tree, rather than just the leaves.
 
-The jostletree can be thought of as representing a series of items with variable span, positioned one after the other. If the span of one item changes, the positions of all of the items after it shift along with it. The jostletree supports logarithmic time access at position, resize node, insert node, and remove node operations.
+To understand what kinds of things a jostletree is good for, imagine a series of objects of varying sizes on a narrow shelf packed tightly together. There are no spaces between them. When you insert a new item, all of the items after it need to move over a bit. If an item's size changes, again, all of the times after it need to move a bit, it stays tightly packed.
 
-Its main application seems to be in sampling randomly from large sets where each element in the set may have a different probability of being drawn.
+The jostletree supports insertion and resizing and removal, and it also supports random-access-at-position, picking a distance from the start and drawing whatever is there. All operations mentioned here run in logarithmic time.
+
+If you need to model a series of things with those properties, you wont do better than the jostletree. It seems to have one other application, perhaps more practical, of sampling randomly from large sets where each element in the set may have a different probability of being drawn. In that, it can also be used to draw with a bias towards one end or the other.
 
 ```rust
 let mut candidate = JostleTree::<usize, char>::new();
@@ -25,12 +27,6 @@ assert_eq!(candidate.get_item(1).unwrap(), &'e');
 The data structure is generic over span types, but `f32`s and `f64`s wont work because they do not implement `Ord`. (The reason they don't implement Ord is that there exists a float for which neither a < b nor a > b. Can you guess which float it is?. It's `NaN`. `NaN` is also the reason floats can't implement `Eq`. There are some data structures that will actually break and do unsafe things if you give trick them into using floats, for this reason. `NaN`s are pretty horrible, really.)
 
 But fear not. You can just use https://crates.io/crates/noisy_float. It's a no-overhead wrapper around floats that disallows `NaN`s.
-
-## Other Possible Applications
-
-It was conceived for the application of storing enormous sequence, or tree UIs, where multiple users could be altering the structure at the same time. Users would be able to view an approximate overview, to jump to arbitrary offsets instantly, all in logorithmic time. Actually doing this might require some concurrency work though
-
-I made this mainly because it pinged my heuristics for potential usefulness and I couldn't find any preexisting implementations. Hopefully others can think of more applications than I can.
 
 ## Past work
 

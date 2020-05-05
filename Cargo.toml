@@ -6,6 +6,7 @@ description = "The Jostle Tree, a data structure for working with long sequences
 repository = "https://github.com/makoConstruct/jostletree.rs"
 license = "MIT"
 readme = "README.md"
+keywords = ["tree", "datastructure", "weighted"]
 
 [dev-dependencies]
 rand = "0.3.0"
