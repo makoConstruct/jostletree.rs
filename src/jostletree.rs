@@ -75,7 +75,6 @@ unsafe fn warp_bptr_const<N,T>(v:*const Nref<N,T>)-> *const *const Branch<N,T> {
 unsafe fn warp_nullable<N,T>(v:*mut Nref<N,T>)-> *mut Branch<N,T> { transmute_copy(&mut *v) }
 
 pub trait Numeric : Ord + Eq + Add<Output=Self> + Sub<Output=Self> + Clone + Default {}
-
 impl<X> Numeric for X where X : Ord + Eq + Add<Output=Self> + Sub<Output=Self> + Clone + Default {}
 
 unsafe fn rotate_right<N,A>(old_root: *mut *mut Branch<N,A>) where N:Numeric { //assumes root and leftofroot are some.
@@ -134,6 +133,8 @@ unsafe fn rotate_left<N,A>(old_root: *mut *mut Branch<N,A>) where N:Numeric { //
 	(*root_to_be).update_count();
 }
 
+type Nref<N,T> = Option<Box<Branch<N,T>>>;
+
 #[derive(Debug)]
 pub struct Branch<N,T> {
 	parent: *mut Branch<N,T>,
@@ -145,7 +146,6 @@ pub struct Branch<N,T> {
 	span:N,
 	total_span:N,
 }
-type Nref<N,T> = Option<Box<Branch<N,T>>>;
 fn eq_branch<N,T>(v:&Nref<N,T>, other:*const Branch<N,T>)-> bool { (other == unsafe{*warp_bptr_const(v)}) }
 
 fn deepness<N:Numeric,T>(nref:&Nref<N,T>)-> u8 {
@@ -193,7 +193,7 @@ fn leftmost_child_mut<N,T>(n: &mut Branch<N,T>)-> &mut Branch<N,T> {
 	}
 }
 
-/// The JostleTree can be thought of as efficiently modelling a sequence of items of variable widths. It allows operations such as
+/// The JostleTree can be thought of as efficiently modeling a sequence of items of variable widths. It allows operations such as
 ///
 /// * jumping to a position and getting whatever item is there
 ///

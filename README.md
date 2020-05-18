@@ -2,11 +2,13 @@
 
 A JostleTree is a Partial Sum Tree with item widths stored in the branches of the tree, rather than just the leaves.
 
-To understand what kinds of things a jostletree is good for, imagine a series of objects of varying sizes on a narrow shelf packed tightly together. There are no spaces between them. When you insert a new item, all of the items after it need to move over a bit. If an item's size changes, again, all of the times after it need to move a bit, it stays tightly packed.
+To understand what kinds of things a jostletree is good for, imagine a series of objects of varying sizes on a narrow shelf packed tightly together. There are no spaces between them. When you insert a new item, all of the items after it need to move over a bit. If an item's size changes, again, all of the items after it need to move a bit, it stays tightly packed.
 
-The jostletree supports insertion and resizing and removal, and it also supports random-access-at-position, picking a distance from the start and drawing whatever is there. All operations mentioned here run in logarithmic time.
+The jostletree supports insertion and resizing and removal, and it also supports random-access-at-position; picking a distance from the start and drawing whatever is there. All operations mentioned here run in logarithmic time.
 
-If you need to model a series of things with those properties, you wont do better than the jostletree. It seems to have one other application, perhaps more practical, of sampling randomly from large sets where each element in the set may have a different probability of being drawn. In that, it can also be used to draw with a bias towards one end or the other.
+If you need to model a series of things with those properties, you wont do better than the jostletree.
+
+One of its notable applications is sampling randomly from large sets where each element in the set may have a different probability of being drawn.
 
 ```rust
 let mut candidate = JostleTree::<usize, char>::new();
