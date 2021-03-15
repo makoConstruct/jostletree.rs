@@ -24,6 +24,10 @@ candidate.insert_at(5, 1, 'e');
 assert_eq!(candidate.get_item(1).unwrap(), &'e');
 ```
 
+## How does it work?
+
+Basically, it's a binary tree where each branch stores a `width:N` value the sum of the widths of its children. You can navigate quickly to the child at a particular offset by looking at your two children and seeing whether the left one is larger or smaller than you need and navigating down depending on that. There are additional details but you probably now understand enough to replicate them yourselves or read the source.
+
 ## Using floats as spans
 
 The data structure is generic over span types, but `f32`s and `f64`s wont work because they do not implement `Ord`. (The reason they don't implement Ord is that there exists a float for which neither a < b nor a >= b. Can you guess which float it is?. It's `NaN`. `NaN` is also the reason floats can't implement `Eq`. There are some data structures that will actually break and do unsafe things if you give trick them into using floats, for this reason. `NaN`s are pretty horrible, really.)
