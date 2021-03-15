@@ -22,7 +22,9 @@ assert_eq!(candidate.get_item(1).unwrap(), &'e');
 
 ## How does it work?
 
-Basically, imagine a binary tree where each branch stores a `width` value, that is the sum of the widths of its children, terminating at the leaves, where the widths are whatever you set them to be. You can navigate quickly to the child at a particular offset by looking at your two children and seeing whether the left one is larger or smaller than you need and navigating down depending on that. There are additional details and optimizations, but you probably now understand enough to replicate them yourselves or read the source.
+Basically, imagine a binary tree where each branch stores a `width` value, that is the sum of the widths of its children, terminating at the leaves, where the widths are whatever you set them to be. You can navigate quickly to the child at a particular offset by looking at your two children and seeing whether the left one is larger or smaller than you need and navigating down depending on that. There are additional details and optimizations, but this gets you a basic understanding.
+
+(Those optimizations are: Items are stored in the branches, there is no distinct leaf type. Each Branch has two width values, the span of their item, and the total_span of their children. We could further optimize it by (instead?) storing the total_span of the left child, so that the left child does not have to be dereferenced if the search should proceed into the right child, but I wont; if we're serious about optimizing it, branches should be bigger, they should hold however many items will fit in a cache line.)
 
 ## Using floats as spans
 
