@@ -1,14 +1,10 @@
 # JostleTree
 
-A JostleTree is a Partial Sum Tree with item widths stored in the branches of the tree, rather than just the leaves.
-
-To understand what kinds of things a jostletree is good for, imagine a series of objects of varying sizes on a narrow shelf packed tightly together. There are no spaces between them. When you insert a new item, all of the items after it need to move over a bit. If an item's size changes, again, all of the items after it need to move a bit, it stays tightly packed.
-
 The jostletree supports insertion and resizing and removal, and it also supports random-access-at-position; picking a distance from the start and drawing whatever is there. All operations mentioned here run in logarithmic time.
 
-If you need to model a series of things with those properties, you wont do better than the jostletree.
+A good way to understand what a jostletree is good for is to imagine it as a series of objects of varying sizes on a narrow shelf that are always packed tightly together. There are no spaces between them. You can insert a new item anywhere, and all of the items after it will slide over a bit to accomodate it. You can change the size of one of the items, again, all of the items after will move a bit, it stays tightly packed.
 
-One of its notable applications is sampling randomly from large sets where each element in the set may have a different probability of being drawn. It is the only solution I'm aware of for random weighted sampling with removal. You can also bias samplings to prefer taking from one end of the list or the other, for instance, if you wanted to sample a content aggregator, so that higher rated, and more recent posts are more likely to be picked, you could sort the contents of the jostletree by age, then draw at `posts.get_item(oldest_allowed*random().powf(3.0))`.
+One of its notable applications is sampling randomly from large sequences of elements where each element in the set may have a different probability of being drawn. It is the only solution I'm aware of for random weighted sampling with removal. You can also bias samplings to prefer taking from one end of the list or the other, for instance, if you wanted to sample a content aggregator, so that higher rated, and more recent posts are more likely to be picked, you could sort the contents of the jostletree by age, then draw at `posts.get_item(oldest_allowed*random().powf(3.0))`.
 
 ```rust
 let mut candidate = JostleTree::<usize, char>::new();
@@ -26,7 +22,7 @@ assert_eq!(candidate.get_item(1).unwrap(), &'e');
 
 ## How does it work?
 
-Basically, it's a binary tree where each branch stores a `width:N` value the sum of the widths of its children. You can navigate quickly to the child at a particular offset by looking at your two children and seeing whether the left one is larger or smaller than you need and navigating down depending on that. There are additional details but you probably now understand enough to replicate them yourselves or read the source.
+Basically, imagine a binary tree where each branch stores a `width` value, that is the sum of the widths of its children, terminating at the leaves, where the widths are whatever you set them to be. You can navigate quickly to the child at a particular offset by looking at your two children and seeing whether the left one is larger or smaller than you need and navigating down depending on that. There are additional details and optimizations, but you probably now understand enough to replicate them yourselves or read the source.
 
 ## Using floats as spans
 
