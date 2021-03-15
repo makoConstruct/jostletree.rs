@@ -8,7 +8,7 @@ The jostletree supports insertion and resizing and removal, and it also supports
 
 If you need to model a series of things with those properties, you wont do better than the jostletree.
 
-One of its notable applications is sampling randomly from large sets where each element in the set may have a different probability of being drawn. It is the only solution I'm aware of for random weighted sampling with removal. You can also bias samplings to prefer taking from one end of the list or the other, for instance, if you wanted to sample a content aggregator, so that higher rated, and more recent posts are more likely to be picked, you could sort the contents of the jostletree by age, then draw at `posts.get_item(oldest_allowed*random().powf(3))`.
+One of its notable applications is sampling randomly from large sets where each element in the set may have a different probability of being drawn. It is the only solution I'm aware of for random weighted sampling with removal. You can also bias samplings to prefer taking from one end of the list or the other, for instance, if you wanted to sample a content aggregator, so that higher rated, and more recent posts are more likely to be picked, you could sort the contents of the jostletree by age, then draw at `posts.get_item(oldest_allowed*random().powf(3.0))`.
 
 ```rust
 let mut candidate = JostleTree::<usize, char>::new();
