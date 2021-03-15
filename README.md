@@ -8,7 +8,7 @@ The jostletree supports insertion and resizing and removal, and it also supports
 
 If you need to model a series of things with those properties, you wont do better than the jostletree.
 
-One of its notable applications is sampling randomly from large sets where each element in the set may have a different probability of being drawn.
+One of its notable applications is sampling randomly from large sets where each element in the set may have a different probability of being drawn. It is the only solution I'm aware of for random weighted sampling with removal. You can also bias samplings to prefer taking from one end of the list or the other, for instance, if you wanted to sample a content aggregator, so that higher rated, and more recent posts are more likely to be picked, you could sort the contents of the jostletree by age, then draw at `posts.get_item(oldest_allowed*random().powf(3))`.
 
 ```rust
 let mut candidate = JostleTree::<usize, char>::new();
@@ -30,6 +30,8 @@ The data structure is generic over span types, but `f32`s and `f64`s wont work b
 
 But fear not. You can just use https://crates.io/crates/noisy_float. It's a no-overhead wrapper around floats that disallows `NaN`s.
 
-## Past work
+## Related data structures
 
 It's very similar to a Partial Sum Tree as described in [AN EFFICIENT METHOD FOR WEIGHTED SAMPLING WITHOUT REPLACEMENT* C. K. WONG AND M. C. EASTON](https://doi.org/10.1137/0209009). The difference is, it stores elements and element weights in branches instead of in special different leaf nodes, reducing the number of allocations by about half, and reducing the number of accesses per query logarithmically? I'm not sure why anybody would do it the other way.
+
+The [Alias Method](https://en.wikipedia.org/wiki/Alias_method) seems to be a faster alternative for random weighted sampling, but as far as I can tell, it doesn't look like it supports fast edits (it has to rebuild?). So it wont do random sampling with removal, there may be other things it wont do.
