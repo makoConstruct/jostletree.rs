@@ -2,7 +2,7 @@
 
 The jostletree supports insertion and resizing and removal, and it also supports random-access-at-position; picking a distance from the start and drawing whatever is there. All operations mentioned here run in logarithmic time.
 
-A good way to understand what a jostletree is good for is to imagine it as a series of objects of varying sizes on a narrow shelf that are always packed tightly together. There are no spaces between them. You can insert a new item anywhere, and all of the items after it will slide over a bit to accomodate it. You can change the size of one of the items, again, all of the items after will move a bit, it stays tightly packed.
+A good way to understand what a jostletree is good for is to imagine it as a series of objects of varying sizes on a long, shallow shelf that are always packed tightly together. There are no spaces between them. You can insert a new item anywhere, and all of the items after it will slide over a bit to accomodate it. You can change the size of one of the items, again, all of the items after will move a bit, it stays tightly packed. You can point at a random location in the shelf and quickly take whatever is there without having to count all of the items before or after it. These are mostly quite ordinary properties for objects on a shelf to have, but until now, not common in datastructures.
 
 One of its notable applications is sampling randomly from large sequences of elements where each element in the set may have a different probability of being drawn. It is the only solution I'm aware of for random weighted sampling with removal. You can also bias samplings to prefer taking from one end of the list or the other, for instance, if you wanted to sample a content aggregator, so that higher rated, and more recent posts are more likely to be picked, you could sort the contents of the jostletree by age, then draw at `posts.get_item(oldest_allowed*random().powf(3.0))`.
 
@@ -28,7 +28,7 @@ Basically, imagine a binary tree where each branch stores a `width` value, that 
 
 ## Using floats as spans
 
-The data structure is generic over span types, but `f32`s and `f64`s wont work because they do not implement `Ord`. (The reason they don't implement Ord is that there exists a float for which neither a < b nor a >= b. Can you guess which float it is?. It's `NaN`. `NaN` is also the reason floats can't implement `Eq`. There are some data structures that will actually break and do unsafe things if you give trick them into using floats, for this reason. `NaN`s are pretty horrible, really.)
+The data structure is generic over span types, but `f32`s and `f64`s wont work because they do not implement `Ord`. (The reason they don't implement Ord is that there exists a float for which neither a < b nor a >= b. Can you guess which float it is?. It's `NaN`. `NaN` is also the reason floats can't implement `Eq`. There are some data structures that will actually break and do unsafe things if you trick them into using floats, for this reason. `NaN`s are pretty horrible, really.)
 
 But fear not. You can just use https://crates.io/crates/noisy_float. It's a no-overhead wrapper around floats that disallows `NaN`s.
 
