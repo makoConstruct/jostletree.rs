@@ -1,5 +1,5 @@
 use std::hash::{Hash, Hasher};
-use std::mem::{uninitialized, forget, transmute, transmute_copy, replace};
+use std::mem::{forget, transmute, transmute_copy, replace, MaybeUninit};
 use std::ptr::{copy_nonoverlapping, null_mut, read};
 use std::fmt;
 use std::ops::{Add, Sub};
@@ -58,13 +58,12 @@ unsafe fn cp_nonoverlapping<T>(src:*const T, dst:*mut T){ copy_nonoverlapping(sr
 
 fn switch_left<T>(a:*mut T, b:*mut T, c:*mut T){
 	debug_assert!(a != b && b != c && a != c);
+	let mut swap = MaybeUninit::<T>::uninit();
 	unsafe{
-		let mut swap:T = uninitialized();
-		cp_nonoverlapping(a, &mut swap);
+		cp_nonoverlapping(a, swap.as_mut_ptr());
 		cp_nonoverlapping(b, a);
 		cp_nonoverlapping(c, b);
-		cp_nonoverlapping(& swap, c);
-		forget(swap);
+		cp_nonoverlapping(swap.assume_init_ref(), c);
 	}
 }
 
@@ -146,7 +145,7 @@ pub struct Branch<N,T> {
 	span:N,
 	total_span:N,
 }
-fn eq_branch<N,T>(v:&Nref<N,T>, other:*const Branch<N,T>)-> bool { (other == unsafe{*warp_bptr_const(v)}) }
+fn eq_branch<N,T>(v:&Nref<N,T>, other:*const Branch<N,T>)-> bool { other == unsafe{*warp_bptr_const(v)} }
 
 fn deepness<N:Numeric,T>(nref:&Nref<N,T>)-> u8 {
 	match *nref { Some(ref bbs) => bbs.deepness, None => 0 } }
@@ -422,9 +421,9 @@ impl<N, T> JostleTree<N, T> where N:Numeric {
 
 impl<N:Numeric + Display, T:Display> Display for JostleTree<N,T> {
 	fn fmt(&self, f:&mut Formatter)-> Result<(), fmt::Error> {
-		try!(write!(f, "JostleTree{{ "));
+		write!(f, "JostleTree{{ ")?;
 		for b in self.slot_iter() {
-			try!(write!(f, "{}:{} ", b.span, &b.v));
+			write!(f, "{}:{} ", b.span, &b.v)?;
 		}
 		write!(f, "}}")
 	}
