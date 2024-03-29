@@ -213,7 +213,7 @@ impl<N, T> JostleTree<N, T> where N:Numeric {
 	/// returns the sum of the spans of all of the items (logarithmic runtime)
 	pub fn total_span(&self)-> N { total_span(&self.head_node) }
 	unsafe fn create_at_and_balance_from<'a>(head_node:*mut Nref<N,T>, v:T, span:N, rcn:&'a mut Nref<N,T>, parent:*mut Branch<N,T>)-> SlotHandle<'a,N,T> {
-		let mut bb = box Branch{v:v, span:span.clone(), deepness:1, count:1, total_span:span, parent:parent, left:None, right:None};
+		let mut bb = Box::new(Branch{v:v, span:span.clone(), deepness:1, count:1, total_span:span, parent:parent, left:None, right:None});
 		let r = warp_lifetime_mut(&mut *bb); //we know that the location of Branch doesn't change, it doesn't get freed, and that it lives as long as the return value.
 		*rcn = Some(bb);
 		let mut p = parent;
